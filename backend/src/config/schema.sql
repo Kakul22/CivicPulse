@@ -35,7 +35,17 @@ CREATE TABLE IF NOT EXISTS upvotes (
     UNIQUE(issue_id, user_id) -- one user can only upvote once per issue
 );
 
+-- Comments table (text support left on an issue, e.g. "I'm facing this too")
+CREATE TABLE IF NOT EXISTS comments (
+    id SERIAL PRIMARY KEY,
+    issue_id INTEGER REFERENCES issues(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
 CREATE INDEX IF NOT EXISTS idx_issues_location ON issues(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_comments_issue ON comments(issue_id);

@@ -27,8 +27,31 @@ export const api = {
     const params = new URLSearchParams(filters).toString();
     return request(`/issues${params ? `?${params}` : ""}`);
   },
+  getMyIssues: (token) => request("/issues/mine", { token }),
   createIssue: (payload, token) =>
     request("/issues", { method: "POST", body: payload, token }),
   toggleUpvote: (issueId, token) =>
     request(`/issues/${issueId}/upvote`, { method: "POST", token }),
+
+  getComments: (issueId) => request(`/issues/${issueId}/comments`),
+  addComment: (issueId, text, token) =>
+    request(`/issues/${issueId}/comments`, { method: "POST", body: { text }, token }),
+
+  // Image upload uses FormData, not JSON — bypasses the request() helper above.
+  uploadImage: async (file, token) => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const res = await fetch(`${API_BASE}/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Image upload failed. Please try again.");
+    }
+    return data;
+  },
 };

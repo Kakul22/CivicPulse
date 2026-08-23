@@ -27,7 +27,8 @@ router.get('/', optionalAuth, async (req, res) => {
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const result = await pool.query(
-      `SELECT i.*, u.name AS reporter_name
+      `SELECT i.*, u.name AS reporter_name,
+              (SELECT COUNT(*) FROM comments c WHERE c.issue_id = i.id)::int AS comment_count
        FROM issues i
        LEFT JOIN users u ON i.user_id = u.id
        ${whereClause}
@@ -39,6 +40,24 @@ router.get('/', optionalAuth, async (req, res) => {
   } catch (err) {
     console.error('List issues error:', err);
     res.status(500).json({ error: 'Failed to fetch issues' });
+  }
+});
+
+// GET /api/issues/mine - issues reported by the logged-in user (for their dashboard)
+// NOTE: this must be defined before GET /:id, otherwise Express will try to
+// match "mine" as an issue id.
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT i.*,
+              (SELECT COUNT(*) FROM comments c WHERE c.issue_id = i.id)::int AS comment_count
+       FROM issues i WHERE i.user_id = $1 ORDER BY i.created_at DESC`,
+      [req.user.id]
+    );
+    res.json({ issues: result.rows });
+  } catch (err) {
+    console.error('Get my issues error:', err);
+    res.status(500).json({ error: 'Failed to fetch your issues' });
   }
 });
 
@@ -154,6 +173,49 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Update status error:', err);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// GET /api/issues/:id/comments - list comments on an issue, newest last
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT c.*, u.name AS author_name
+       FROM comments c
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE c.issue_id = $1
+       ORDER BY c.created_at ASC`,
+      [req.params.id]
+    );
+    res.json({ comments: result.rows });
+  } catch (err) {
+    console.error('List comments error:', err);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+// POST /api/issues/:id/comments - add a comment ("support" text) to an issue
+router.post('/:id/comments', requireAuth, async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO comments (issue_id, user_id, text)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [req.params.id, req.user.id, text.trim()]
+    );
+
+    const userResult = await pool.query('SELECT name FROM users WHERE id = $1', [req.user.id]);
+    const comment = { ...result.rows[0], author_name: userResult.rows[0]?.name || 'Someone' };
+    res.status(201).json({ comment });
+  } catch (err) {
+    console.error('Add comment error:', err);
+    res.status(500).json({ error: 'Failed to add comment' });
   }
 });
 
