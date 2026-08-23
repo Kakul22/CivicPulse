@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
@@ -23,8 +23,16 @@ export default function ReportIssuePage() {
   });
   const [coords, setCoords] = useState(null);
   const [locating, setLocating] = useState(false);
+
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -52,6 +60,31 @@ export default function ReportIssuePage() {
     );
   }
 
+  async function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImagePreview(URL.createObjectURL(file));
+    setError("");
+    setImageUploading(true);
+    try {
+      const { url } = await api.uploadImage(file, token);
+      setImageUrl(url);
+    } catch (err) {
+      setError(err.message);
+      setImagePreview(null);
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function removeImage() {
+    setImagePreview(null);
+    setImageUrl(null);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -71,10 +104,11 @@ export default function ReportIssuePage() {
           address: form.address || null,
           latitude: coords.latitude,
           longitude: coords.longitude,
+          image_url: imageUrl || null,
         },
         token
       );
-      navigate("/");
+      navigate("/my-reports");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,6 +128,69 @@ export default function ReportIssuePage() {
       {error && <div className="form-error">{error}</div>}
 
       <form onSubmit={handleSubmit}>
+        <div className="field">
+          <label>Photo</label>
+
+          {!imagePreview && (
+            <div className="photo-capture">
+              <button
+                type="button"
+                className="photo-capture-btn"
+                onClick={() => cameraInputRef.current?.click()}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 8a2 2 0 0 1 2-2h1.5l1-1.6A1 1 0 0 1 9.35 4h5.3a1 1 0 0 1 .85.4L16.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <circle cx="12" cy="13" r="3.3" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                Take a photo
+              </button>
+              <button
+                type="button"
+                className="photo-capture-btn"
+                onClick={() => galleryInputRef.current?.click()}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="m3 16 5-5 4 4 3-3 6 6" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="8" cy="9" r="1.4" fill="currentColor" />
+                </svg>
+                Choose from gallery
+              </button>
+            </div>
+          )}
+
+          {/* capture="environment" opens the rear camera on mobile devices */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: "none" }}
+            onChange={handleFileSelected}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleFileSelected}
+          />
+
+          {imagePreview && (
+            <div className="image-preview-wrap">
+              <img className="image-preview" src={imagePreview} alt="Issue preview" />
+              <button type="button" className="image-preview-remove" onClick={removeImage}>
+                ✕
+              </button>
+            </div>
+          )}
+          {imageUploading && <p className="image-uploading-note">Uploading photo…</p>}
+        </div>
+
         <div className="field">
           <label htmlFor="title">Title</label>
           <input
@@ -164,7 +261,7 @@ export default function ReportIssuePage() {
           </span>
         </div>
 
-        <button className="btn btn-primary btn-block" disabled={submitting}>
+        <button className="btn btn-primary btn-block" disabled={submitting || imageUploading}>
           {submitting ? "Submitting…" : "Submit report"}
         </button>
       </form>

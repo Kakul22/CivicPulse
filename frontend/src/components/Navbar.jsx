@@ -30,6 +30,12 @@ export default function Navbar() {
           CivicPulse
         </Link>
 
+        <nav className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/issues">Issues</Link>
+          {user && <Link to="/my-reports">My Reports</Link>}
+        </nav>
+
         <div className="nav-actions">
           {user ? (
             <>
