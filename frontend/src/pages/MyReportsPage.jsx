@@ -34,6 +34,12 @@ export default function MyReportsPage() {
     );
   }
 
+  function handleStatusChange(issueId, newStatus) {
+    setIssues((prev) =>
+      prev.map((i) => (i.id === issueId ? { ...i, status: newStatus } : i))
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -58,7 +64,13 @@ export default function MyReportsPage() {
 
       {!loading &&
         issues.map((issue) => (
-          <IssueCard key={issue.id} issue={issue} onUpvoteChange={handleUpvoteChange} />
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            onUpvoteChange={handleUpvoteChange}
+            editable
+            onStatusChange={handleStatusChange}
+          />
         ))}
     </div>
   );

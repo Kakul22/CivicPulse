@@ -12,6 +12,12 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
+const STATUS_OPTIONS = [
+  { value: "reported", label: "Reported" },
+  { value: "in_progress", label: "In progress" },
+  { value: "resolved", label: "Resolved" },
+];
+
 function timeAgo(dateString) {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -23,13 +29,18 @@ function timeAgo(dateString) {
   return `${days}d ago`;
 }
 
-export default function IssueCard({ issue, onUpvoteChange }) {
+// `editable` — pass true only on pages where the current user is guaranteed
+// to be the reporter (e.g. My Reports), since only the reporter is allowed
+// to change an issue's status.
+export default function IssueCard({ issue, onUpvoteChange, editable = false, onStatusChange }) {
   const { token } = useAuth();
   const [count, setCount] = useState(issue.upvote_count);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(issue.status);
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState(null); // null = not loaded yet
+  const [comments, setComments] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
@@ -45,6 +56,22 @@ export default function IssueCard({ issue, onUpvoteChange }) {
       console.error(err);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleStatusChange(e) {
+    const newStatus = e.target.value;
+    const previous = status;
+    setStatus(newStatus);
+    setStatusSaving(true);
+    try {
+      await api.updateStatus(issue.id, newStatus, token);
+      onStatusChange?.(issue.id, newStatus);
+    } catch (err) {
+      console.error(err);
+      setStatus(previous);
+    } finally {
+      setStatusSaving(false);
     }
   }
 
@@ -89,7 +116,7 @@ export default function IssueCard({ issue, onUpvoteChange }) {
       <div className="issue-card-body">
         <div className="issue-card-top">
           <h3 className="issue-title">{issue.title}</h3>
-          <StatusStamp status={issue.status} />
+          <StatusStamp status={status} />
         </div>
 
         <p className="issue-desc">{issue.description}</p>
@@ -105,11 +132,7 @@ export default function IssueCard({ issue, onUpvoteChange }) {
           </div>
 
           <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              className="upvote-btn"
-              onClick={toggleComments}
-              title="View and add comments"
-            >
+            <button className="upvote-btn" onClick={toggleComments} title="View and add comments">
               💬 {comments ? comments.length : issue.comment_count ?? ""}
             </button>
             <button
@@ -122,6 +145,26 @@ export default function IssueCard({ issue, onUpvoteChange }) {
             </button>
           </div>
         </div>
+
+        {editable && (
+          <div className="status-control">
+            <label htmlFor={`status-${issue.id}`}>Update status:</label>
+            <select
+              id={`status-${issue.id}`}
+              className="status-select"
+              value={status}
+              onChange={handleStatusChange}
+              disabled={statusSaving}
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {statusSaving && <span className="field-hint">Saving…</span>}
+          </div>
+        )}
 
         {showComments && (
           <div className="comments-section">

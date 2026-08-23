@@ -32,6 +32,8 @@ export const api = {
     request("/issues", { method: "POST", body: payload, token }),
   toggleUpvote: (issueId, token) =>
     request(`/issues/${issueId}/upvote`, { method: "POST", token }),
+  updateStatus: (issueId, status, token) =>
+    request(`/issues/${issueId}/status`, { method: "PATCH", body: { status }, token }),
 
   getComments: (issueId) => request(`/issues/${issueId}/comments`),
   addComment: (issueId, text, token) =>

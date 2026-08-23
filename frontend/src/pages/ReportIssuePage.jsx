@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
+import LocationPicker from "../components/LocationPicker.jsx";
 
 const CATEGORIES = [
   { value: "garbage", label: "Garbage" },
@@ -21,8 +22,7 @@ export default function ReportIssuePage() {
     category: "garbage",
     address: "",
   });
-  const [coords, setCoords] = useState(null);
-  const [locating, setLocating] = useState(false);
+  const [location, setLocation] = useState(null); // { lat, lng }
 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
@@ -36,28 +36,6 @@ export default function ReportIssuePage() {
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      setError("Your browser doesn't support location. Enter an address instead.");
-      return;
-    }
-    setLocating(true);
-    setError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-        setLocating(false);
-      },
-      () => {
-        setError("Couldn't get your location. You can still enter an address below.");
-        setLocating(false);
-      }
-    );
   }
 
   async function handleFileSelected(e) {
@@ -89,8 +67,8 @@ export default function ReportIssuePage() {
     e.preventDefault();
     setError("");
 
-    if (!coords) {
-      setError("Please share your location so we can pin this issue on the map.");
+    if (!location) {
+      setError("Please set a location — use your current location or tap the map.");
       return;
     }
 
@@ -102,8 +80,8 @@ export default function ReportIssuePage() {
           description: form.description,
           category: form.category,
           address: form.address || null,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
+          latitude: location.lat,
+          longitude: location.lng,
           image_url: imageUrl || null,
         },
         token
@@ -244,21 +222,7 @@ export default function ReportIssuePage() {
 
         <div className="field">
           <label>Location</label>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={useMyLocation}
-            disabled={locating}
-          >
-            {locating
-              ? "Getting location…"
-              : coords
-                ? "📍 Location captured — tap to refresh"
-                : "📍 Use my current location"}
-          </button>
-          <span className="field-hint">
-            We use this to pin the issue accurately for others nearby.
-          </span>
+          <LocationPicker value={location} onChange={setLocation} />
         </div>
 
         <button className="btn btn-primary btn-block" disabled={submitting || imageUploading}>
