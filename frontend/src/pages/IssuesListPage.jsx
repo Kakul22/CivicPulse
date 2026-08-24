@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import IssueCard from "../components/IssueCard.jsx";
+import IssueMap from "../components/IssueMap.jsx";
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -16,6 +17,7 @@ export default function IssuesListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [category, setCategory] = useState("");
+  const [view, setView] = useState("list"); // 'list' | 'map'
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +56,15 @@ export default function IssuesListPage() {
         </div>
       </div>
 
+      <div className="view-toggle">
+        <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
+          List
+        </button>
+        <button className={view === "map" ? "active" : ""} onClick={() => setView("map")}>
+          Map
+        </button>
+      </div>
+
       <div className="filter-bar">
         {CATEGORIES.map((c) => (
           <button
@@ -77,7 +88,12 @@ export default function IssuesListPage() {
         </div>
       )}
 
+      {!loading && !error && issues.length > 0 && view === "map" && (
+        <IssueMap issues={issues} />
+      )}
+
       {!loading &&
+        view === "list" &&
         issues.map((issue) => (
           <IssueCard key={issue.id} issue={issue} onUpvoteChange={handleUpvoteChange} />
         ))}

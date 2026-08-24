@@ -150,8 +150,9 @@ router.post('/:id/upvote', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/issues/:id/status - update status (requires login for now;
-// later you can restrict this to admins only)
+// PATCH /api/issues/:id/status - update status. Only the person who reported
+// the issue can change its status, since they're the one who can confirm
+// it's actually been fixed.
 router.patch('/:id/status', requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
@@ -160,14 +161,18 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
     }
 
+    const existing = await pool.query('SELECT user_id FROM issues WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Issue not found' });
+    }
+    if (existing.rows[0].user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only the person who reported this issue can update its status' });
+    }
+
     const result = await pool.query(
       'UPDATE issues SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [status, req.params.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Issue not found' });
-    }
 
     res.json({ issue: result.rows[0] });
   } catch (err) {
