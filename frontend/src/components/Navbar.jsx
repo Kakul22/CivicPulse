@@ -32,17 +32,22 @@ export default function Navbar() {
 
         <nav className="nav-links">
           <Link to="/">Home</Link>
-          <Link to="/issues">Issues</Link>
-          {user && <Link to="/my-reports">My Reports</Link>}
+          <Link to="/issues">{user?.role === "authority" ? "Dashboard" : "Issues"}</Link>
+          {user && user.role !== "authority" && <Link to="/my-reports">My Reports</Link>}
         </nav>
 
         <div className="nav-actions">
           {user ? (
             <>
-              <span className="nav-user">Hi, {user.name.split(" ")[0]}</span>
-              <Link to="/report" className="btn btn-primary">
-                Report an issue
-              </Link>
+              <span className="nav-user">
+                Hi, {user.name.split(" ")[0]}
+                {user.role === "authority" && <span className="authority-badge">Authority</span>}
+              </span>
+              {user.role !== "authority" && (
+                <Link to="/report" className="btn btn-primary">
+                  Report an issue
+                </Link>
+              )}
               <button className="btn btn-ghost" onClick={handleLogout}>
                 Log out
               </button>

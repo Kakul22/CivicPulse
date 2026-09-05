@@ -27,7 +27,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const result = await pool.query(
-      `SELECT i.*, u.name AS reporter_name,
+      `SELECT i.*, u.name AS reporter_name, u.email AS reporter_email,
               (SELECT COUNT(*) FROM comments c WHERE c.issue_id = i.id)::int AS comment_count
        FROM issues i
        LEFT JOIN users u ON i.user_id = u.id
@@ -36,7 +36,17 @@ router.get('/', optionalAuth, async (req, res) => {
       values
     );
 
-    res.json({ issues: result.rows });
+    // Only authority accounts get to see the reporter's contact email —
+    // regular citizens browsing the list shouldn't see each other's emails.
+    const issues = result.rows.map((issue) => {
+      if (req.user?.role !== 'authority') {
+        const { reporter_email, ...rest } = issue;
+        return rest;
+      }
+      return issue;
+    });
+
+    res.json({ issues });
   } catch (err) {
     console.error('List issues error:', err);
     res.status(500).json({ error: 'Failed to fetch issues' });
@@ -165,8 +175,10 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Issue not found' });
     }
-    if (existing.rows[0].user_id !== req.user.id) {
-      return res.status(403).json({ error: 'Only the person who reported this issue can update its status' });
+    const isOwner = existing.rows[0].user_id === req.user.id;
+    const isAuthority = req.user.role === 'authority';
+    if (!isOwner && !isAuthority) {
+      return res.status(403).json({ error: 'Only the reporter or an authority account can update this issue\'s status' });
     }
 
     const result = await pool.query(

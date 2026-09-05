@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AuthPage() {
   const [mode, setMode] = useState("login"); // 'login' | 'signup'
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "citizen" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -47,17 +47,41 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit}>
           {mode === "signup" && (
-            <div className="field">
-              <label htmlFor="name">Full name</label>
-              <input
-                id="name"
-                type="text"
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                placeholder="Kakul Mittal"
-                required
-              />
-            </div>
+            <>
+              <div className="field">
+                <label htmlFor="name">Full name</label>
+                <input
+                  id="name"
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => updateField("name", e.target.value)}
+                  placeholder="Kakul Mittal"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Account type</label>
+                <div className="role-picker">
+                  <button
+                    type="button"
+                    className={`role-option ${form.role === "citizen" ? "selected" : ""}`}
+                    onClick={() => updateField("role", "citizen")}
+                  >
+                    <span className="role-option-title">Citizen</span>
+                    <span className="role-option-desc">Report issues, upvote, comment</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`role-option ${form.role === "authority" ? "selected" : ""}`}
+                    onClick={() => updateField("role", "authority")}
+                  >
+                    <span className="role-option-title">Government Authority</span>
+                    <span className="role-option-desc">Review and resolve reported issues</span>
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="field">
