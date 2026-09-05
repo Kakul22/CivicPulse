@@ -76,15 +76,20 @@ export default function LandingPage() {
           </p>
 
           <div className="hero-actions">
-            <Link
-              to={user ? "/report" : "/login"}
-              className="btn btn-on-ink btn-lg"
-            >
-              Report an issue
-            </Link>
-            <Link to="/issues" className="btn btn-outline-on-ink btn-lg">
-              Browse what's reported
-            </Link>
+            {user?.role === "authority" ? (
+              <Link to="/issues" className="btn btn-on-ink btn-lg">
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to={user ? "/report" : "/login"} className="btn btn-on-ink btn-lg">
+                  Report an issue
+                </Link>
+                <Link to="/issues" className="btn btn-outline-on-ink btn-lg">
+                  Browse what's reported
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="hero-plaques">
@@ -166,11 +171,23 @@ export default function LandingPage() {
 
       <section className="section" style={{ paddingBottom: 0 }}>
         <div className="cta-band">
-          <h2>Seen something today?</h2>
-          <p>It takes under a minute to report it — and it starts a paper trail that's hard to ignore.</p>
-          <Link to={user ? "/report" : "/login"} className="btn btn-on-ink btn-lg">
-            Report an issue
-          </Link>
+          {user?.role === "authority" ? (
+            <>
+              <h2>Issues are waiting for review</h2>
+              <p>Head to the dashboard to see what's been reported and update their status.</p>
+              <Link to="/issues" className="btn btn-on-ink btn-lg">
+                Go to dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <h2>Seen something today?</h2>
+              <p>It takes under a minute to report it — and it starts a paper trail that's hard to ignore.</p>
+              <Link to={user ? "/report" : "/login"} className="btn btn-on-ink btn-lg">
+                Report an issue
+              </Link>
+            </>
+          )}
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import IssueCard from "../components/IssueCard.jsx";
 import IssueMap from "../components/IssueMap.jsx";
 
@@ -13,6 +14,7 @@ const CATEGORIES = [
 ];
 
 export default function IssuesListPage() {
+  const { user } = useAuth();
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,6 +46,12 @@ export default function IssuesListPage() {
   function handleUpvoteChange(issueId, newCount) {
     setIssues((prev) =>
       prev.map((i) => (i.id === issueId ? { ...i, upvote_count: newCount } : i))
+    );
+  }
+
+  function handleStatusChange(issueId, newStatus) {
+    setIssues((prev) =>
+      prev.map((i) => (i.id === issueId ? { ...i, status: newStatus } : i))
     );
   }
 
@@ -95,7 +103,13 @@ export default function IssuesListPage() {
       {!loading &&
         view === "list" &&
         issues.map((issue) => (
-          <IssueCard key={issue.id} issue={issue} onUpvoteChange={handleUpvoteChange} />
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            onUpvoteChange={handleUpvoteChange}
+            editable={user?.role === "authority"}
+            onStatusChange={handleStatusChange}
+          />
         ))}
     </div>
   );

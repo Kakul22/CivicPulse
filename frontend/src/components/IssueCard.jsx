@@ -148,21 +148,31 @@ export default function IssueCard({ issue, onUpvoteChange, editable = false, onS
 
         {editable && (
           <div className="status-control">
-            <label htmlFor={`status-${issue.id}`}>Update status:</label>
-            <select
-              id={`status-${issue.id}`}
-              className="status-select"
-              value={status}
-              onChange={handleStatusChange}
-              disabled={statusSaving}
-            >
-              {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {statusSaving && <span className="field-hint">Saving…</span>}
+            {issue.reporter_name && (
+              <div className="reporter-contact">
+                <span className="field-hint">
+                  Reported by <strong>{issue.reporter_name}</strong>
+                  {issue.reporter_email && <> · {issue.reporter_email}</>}
+                </span>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <label htmlFor={`status-${issue.id}`}>Update status:</label>
+              <select
+                id={`status-${issue.id}`}
+                className="status-select"
+                value={status}
+                onChange={handleStatusChange}
+                disabled={statusSaving}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {statusSaving && <span className="field-hint">Saving…</span>}
+            </div>
           </div>
         )}
 

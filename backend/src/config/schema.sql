@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- 'role' distinguishes ordinary citizens from government/authority accounts.
+-- Authority accounts can update the status of ANY issue, not just their own.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'citizen';
+
 -- Issues table
 CREATE TABLE IF NOT EXISTS issues (
     id SERIAL PRIMARY KEY,

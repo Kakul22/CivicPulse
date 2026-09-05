@@ -10,8 +10,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
 
-  const signup = useCallback(async ({ name, email, password }) => {
-    const data = await api.signup({ name, email, password });
+  const signup = useCallback(async ({ name, email, password, role }) => {
+    const data = await api.signup({ name, email, password, role });
     setUser(data.user);
     setToken(data.token);
   }, []);

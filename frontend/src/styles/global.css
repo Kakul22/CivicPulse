@@ -181,6 +181,20 @@ select {
   margin-right: 4px;
 }
 
+.authority-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-deep);
+  background: var(--brand-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
 /* ============================================
    Buttons
    ============================================ */
@@ -644,6 +658,40 @@ select {
   font-weight: 700;
   padding: 0;
   margin-left: 4px;
+}
+
+.role-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.role-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  text-align: left;
+}
+
+.role-option.selected {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.role-option-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.role-option-desc {
+  font-size: 12px;
+  color: var(--ink-soft);
 }
 
 /* ============================================

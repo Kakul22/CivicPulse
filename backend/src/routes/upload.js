@@ -1,29 +1,19 @@
 import { Router } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
 import { requireAuth } from '../middleware/auth.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '../../uploads');
-
-// Make sure the uploads folder exists before multer tries to write to it
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, unique);
-  },
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Keep the file in memory instead of writing to disk — cloud hosting
+// platforms (Render, etc.) wipe local disk storage on every restart/redeploy,
+// so images must go straight to a permanent cloud store like Cloudinary.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) {
@@ -33,16 +23,35 @@ const upload = multer({
   },
 });
 
+function uploadBufferToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'civicpulse-issues' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+}
+
 const router = Router();
 
-// POST /api/upload - accepts a single image, returns a URL to store on an issue
-router.post('/', requireAuth, upload.single('image'), (req, res) => {
+// POST /api/upload - accepts a single image, uploads it to Cloudinary,
+// returns the permanent URL to store on an issue.
+router.post('/', requireAuth, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
-  // Build an absolute URL so the frontend can use it directly as <img src>
-  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.status(201).json({ url });
+
+  try {
+    const result = await uploadBufferToCloudinary(req.file.buffer);
+    res.status(201).json({ url: result.secure_url });
+  } catch (err) {
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ error: 'Image upload failed. Please try again.' });
+  }
 });
 
 export default router;
