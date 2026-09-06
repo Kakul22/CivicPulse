@@ -2,7 +2,9 @@
 
 A civic issue reporting platform. Spot a pothole, an overflowing bin, or a dead streetlight — report it with a photo and a pinned location, and track it until it's resolved.
 
-Built as a full-stack learning project: React frontend, Node/Express backend, PostgreSQL database (hosted on Neon), deployed as a real, working web app.
+**🔗 Live demo:** [civic-pulse-eight-vert.vercel.app](https://civic-pulse-eight-vert.vercel.app)
+
+Built as a full-stack learning project: React frontend, Node/Express backend, PostgreSQL database (Neon), deployed on Vercel + Render.
 
 ---
 
@@ -18,8 +20,12 @@ Built as a full-stack learning project: React frontend, Node/Express backend, Po
 - Track your own reports on a personal "My Reports" dashboard
 - Mark your own reported issue's status as it moves from **Reported → In Progress → Resolved**
 
-**Coming next:**
-- A government/authority-side portal — a separate login for civic bodies to view reported issues in their jurisdiction, respond to them, and update status on the public's behalf once genuinely fixed
+**For government/authority accounts:**
+- A separate account type, chosen at signup
+- A dashboard showing every reported issue, with live counts by status
+- See the reporter's name and email for accountability
+- Update the status of *any* issue, not just ones they filed
+- No "Report an issue" clutter in their view — the interface adapts to the role
 
 ---
 
@@ -27,11 +33,11 @@ Built as a full-stack learning project: React frontend, Node/Express backend, Po
 
 | Layer | Choice |
 |---|---|
-| Frontend | React (Vite) + React Router |
-| Backend | Node.js + Express |
-| Database | PostgreSQL (hosted on [Neon](https://neon.tech)) |
-| Auth | JWT (JSON Web Tokens) + bcrypt password hashing |
-| Image storage | Local disk via Multer *(swap for Cloudinary/S3 before production deploy)* |
+| Frontend | React (Vite) + React Router, deployed on Vercel |
+| Backend | Node.js + Express, deployed on Render |
+| Database | PostgreSQL, hosted on [Neon](https://neon.tech) |
+| Auth | JWT (JSON Web Tokens) + bcrypt password hashing, with citizen/authority roles |
+| Image storage | Cloudinary (permanent cloud storage, survives redeploys) |
 | Maps | Leaflet + OpenStreetMap (free, no API key needed) |
 | DB driver | `@neondatabase/serverless` — connects over WebSocket/HTTPS instead of raw Postgres TCP, so it works even on networks that block port 5432 |
 
@@ -47,7 +53,6 @@ civicpulse/
 │   │   ├── middleware/     # JWT auth middleware
 │   │   ├── routes/        # auth, issues, upload endpoints
 │   │   └── server.js
-│   └── uploads/            # uploaded issue photos (gitignored)
 └── frontend/
     └── src/
         ├── components/     # Navbar, IssueCard, LocationPicker, IssueMap, etc.
@@ -66,13 +71,15 @@ civicpulse/
 ```bash
 cd backend
 npm install
-cp .env.example .env    # fill in DATABASE_URL and JWT_SECRET
+cp .env.example .env    # fill in DATABASE_URL, JWT_SECRET, and Cloudinary credentials
 npm run dev
 ```
 
 Runs on `http://localhost:5000`. Health check: `GET /api/health`.
 
 **Database setup:** create a free Postgres project on [neon.tech](https://neon.tech), copy the connection string into `.env`, then run `src/config/schema.sql` in Neon's SQL Editor to create the tables.
+
+**Image uploads:** create a free account on [cloudinary.com](https://cloudinary.com), copy your cloud name, API key, and API secret into `.env`.
 
 ### 2. Frontend
 
@@ -99,30 +106,31 @@ Typography: Space Grotesk for headings, Inter for body text, IBM Plex Mono for c
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/api/auth/signup` | No | Create an account |
+| POST | `/api/auth/signup` | No | Create an account (citizen or authority) |
 | POST | `/api/auth/login` | No | Log in |
 | GET | `/api/issues` | No | List issues (filter with `?category=`) |
 | GET | `/api/issues/mine` | Yes | Issues reported by the logged-in user |
 | POST | `/api/issues` | Yes | Report a new issue |
 | POST | `/api/issues/:id/upvote` | Yes | Toggle upvote |
-| PATCH | `/api/issues/:id/status` | Yes (owner only) | Update status |
+| PATCH | `/api/issues/:id/status` | Yes (owner or authority) | Update status |
 | GET | `/api/issues/:id/comments` | No | List comments |
 | POST | `/api/issues/:id/comments` | Yes | Add a comment |
-| POST | `/api/upload` | Yes | Upload an issue photo |
+| POST | `/api/upload` | Yes | Upload an issue photo to Cloudinary |
 
 ---
 
 ## Roadmap
 
 - [x] Auth, issue reporting, upvotes, comments
-- [x] Photo capture/upload
+- [x] Photo capture/upload (Cloudinary)
 - [x] Interactive map (view + location picker)
 - [x] Owner-controlled status updates
-- [ ] Government/authority portal with jurisdiction-based issue views
-- [ ] Cloud image storage (Cloudinary/S3) for production
-- [ ] Persistent login (currently session is in-memory only)
-- [ ] Deployment (Render/Vercel)
+- [x] Government/authority accounts with a dedicated dashboard
+- [x] Live deployment (Vercel + Render + Neon)
+- [ ] Persistent login (currently session is in-memory only — refreshing logs you out)
+- [ ] Email/SMS notifications when an issue's status changes
+- [ ] Pagination for large issue lists
 
 ---
 
-Built by Kakul Mittal as a hands-on project to learn full-stack development and a real Git branch → PR → merge workflow.
+Built by Kakul Mittal as a hands-on project to learn full-stack development, a real Git branch → PR → merge workflow, and end-to-end deployment.
