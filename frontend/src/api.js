@@ -39,6 +39,13 @@ export const api = {
   addComment: (issueId, text, token) =>
     request(`/issues/${issueId}/comments`, { method: "POST", body: { text }, token }),
 
+  // Duplicate detection: unresolved issues within ~200m of a point.
+  getNearby: (lat, lng, category) => {
+    const params = new URLSearchParams({ lat, lng });
+    if (category) params.set("category", category);
+    return request(`/nearby?${params.toString()}`);
+  },
+
   // Image upload uses FormData, not JSON — bypasses the request() helper above.
   uploadImage: async (file, token) => {
     const formData = new FormData();

@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import issuesRoutes from './routes/issues.js';
 import uploadRoutes from './routes/upload.js';
+import nearbyRoutes from './routes/nearby.js';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/issues', issuesRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/nearby', nearbyRoutes);
 
 // 404 handler
 app.use((req, res) => {

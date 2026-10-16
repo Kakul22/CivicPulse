@@ -1,8 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
 import LocationPicker from "../components/LocationPicker.jsx";
+import NearbyIssues from "../components/NearbyIssues.jsx";
+import CameraCapture from "../components/CameraCapture.jsx";
 
 const CATEGORIES = [
   { value: "garbage", label: "Garbage" },
@@ -23,6 +25,7 @@ export default function ReportIssuePage() {
     address: "",
   });
   const [location, setLocation] = useState(null); // { lat, lng }
+  const [nearby, setNearby] = useState([]);
 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
@@ -30,6 +33,7 @@ export default function ReportIssuePage() {
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
 
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -38,10 +42,61 @@ export default function ReportIssuePage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleFileSelected(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Duplicate detection: whenever the pin or category changes, look for
+  // unresolved issues of the same category within ~200m. The 500ms delay
+  // (debounce) avoids firing a request on every tiny pin drag.
+  useEffect(() => {
+    if (!location) {
+      setNearby([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .getNearby(location.lat, location.lng, form.category)
+        .then((data) => {
+          if (!cancelled) setNearby(data.issues);
+        })
+        .catch(() => {
+          if (!cancelled) setNearby([]);
+        });
+    }, 500);
 
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [location, form.category]);
+
+  // "Take a photo": use the live in-app camera when the browser supports it
+  // (works on laptops AND phones, needs HTTPS or localhost). Otherwise fall
+  // back to the native file input with capture="environment".
+  function openCamera() {
+    if (navigator.mediaDevices?.getUserMedia) {
+      setShowCamera(true);
+    } else {
+      cameraInputRef.current?.click();
+    }
+  }
+
+  function handleCameraCapture(file) {
+    setShowCamera(false);
+    processFile(file);
+  }
+
+  // If the live camera is blocked (e.g. some in-app browsers), let the user
+  // use the phone's own camera app instead.
+  function handleCameraFallback() {
+    setShowCamera(false);
+    cameraInputRef.current?.click();
+  }
+
+  function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }
+
+  async function processFile(file) {
     setImagePreview(URL.createObjectURL(file));
     setError("");
     setImageUploading(true);
@@ -105,6 +160,14 @@ export default function ReportIssuePage() {
 
       {error && <div className="form-error">{error}</div>}
 
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+          onFallback={handleCameraFallback}
+        />
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label>Photo</label>
@@ -114,7 +177,7 @@ export default function ReportIssuePage() {
               <button
                 type="button"
                 className="photo-capture-btn"
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={openCamera}
               >
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
                   <path
@@ -224,6 +287,8 @@ export default function ReportIssuePage() {
           <label>Location</label>
           <LocationPicker value={location} onChange={setLocation} />
         </div>
+
+        <NearbyIssues issues={nearby} />
 
         <button className="btn btn-primary btn-block" disabled={submitting || imageUploading}>
           {submitting ? "Submitting…" : "Submit report"}
