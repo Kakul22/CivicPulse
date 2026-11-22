@@ -29,9 +29,9 @@ function timeAgo(dateString) {
   return `${days}d ago`;
 }
 
-// `editable` — pass true only on pages where the current user is guaranteed
-// to be the reporter (e.g. My Reports), since only the reporter is allowed
-// to change an issue's status.
+// `editable` — pass true only for authority users (dashboard). It shows the
+// status dropdown and the reporter's contact. The backend enforces the same
+// rule, so hiding the button here is only for a clean UI.
 export default function IssueCard({ issue, onUpvoteChange, editable = false, onStatusChange }) {
   const { token } = useAuth();
   const [count, setCount] = useState(issue.upvote_count);

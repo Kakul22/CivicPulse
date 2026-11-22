@@ -23,9 +23,15 @@ export const api = {
   signup: (payload) => request("/auth/signup", { method: "POST", body: payload }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload }),
 
-  getIssues: (filters = {}) => {
+  // Token is optional but IMPORTANT for authority accounts: without it the
+  // server can't tell who is asking, so reporter contact details get hidden.
+  getIssues: (filters = {}, token) => {
     const params = new URLSearchParams(filters).toString();
-    return request(`/issues${params ? `?${params}` : ""}`);
+    return request(`/issues${params ? `?${params}` : ""}`, { token });
+  },
+  getNearbyIssues: ({ lat, lng, category, radius = 200 }, token) => {
+    const params = new URLSearchParams({ lat, lng, category, radius }).toString();
+    return request(`/issues/nearby?${params}`, { token });
   },
   getMyIssues: (token) => request("/issues/mine", { token }),
   createIssue: (payload, token) =>
@@ -38,13 +44,6 @@ export const api = {
   getComments: (issueId) => request(`/issues/${issueId}/comments`),
   addComment: (issueId, text, token) =>
     request(`/issues/${issueId}/comments`, { method: "POST", body: { text }, token }),
-
-  // Duplicate detection: unresolved issues within ~200m of a point.
-  getNearby: (lat, lng, category) => {
-    const params = new URLSearchParams({ lat, lng });
-    if (category) params.set("category", category);
-    return request(`/nearby?${params.toString()}`);
-  },
 
   // Image upload uses FormData, not JSON — bypasses the request() helper above.
   uploadImage: async (file, token) => {

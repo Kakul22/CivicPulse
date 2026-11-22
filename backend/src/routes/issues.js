@@ -53,6 +53,62 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/issues/nearby?lat=..&lng=..&category=..&radius=200
+// Finds UNRESOLVED issues of the same category within `radius` metres, so the
+// report form can warn about duplicates. Distance is computed in SQL with the
+// Haversine formula, so we never load the whole table into Node.
+// NOTE: defined before GET /:id so "nearby" isn't treated as an issue id.
+router.get('/nearby', requireAuth, async (req, res) => {
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const radius = req.query.radius === undefined ? 200 : Number(req.query.radius);
+    const category = req.query.category;
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ error: 'Valid lat and lng are required' });
+    }
+    if (!Number.isFinite(radius) || radius <= 0 || radius > 1000) {
+      return res.status(400).json({ error: 'radius must be between 1 and 1000 metres' });
+    }
+    if (!VALID_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` });
+    }
+
+    // Bounding box first (cheap, can use the lat/lng index), exact Haversine after.
+    const latDelta = radius / 111320;
+    const lngDelta = radius / (111320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+
+    const result = await pool.query(
+      `SELECT * FROM (
+         SELECT i.id, i.title, i.category, i.status, i.upvote_count, i.address, i.image_url, i.created_at,
+                EXISTS (SELECT 1 FROM upvotes u WHERE u.issue_id = i.id AND u.user_id = $7) AS supported_by_me,
+                6371000 * 2 * ASIN(SQRT(LEAST(1,
+                  POWER(SIN(RADIANS(i.latitude - $1::float8) / 2), 2) +
+                  COS(RADIANS($1::float8)) * COS(RADIANS(i.latitude)) *
+                  POWER(SIN(RADIANS(i.longitude - $2::float8) / 2), 2)
+                ))) AS distance_m
+         FROM issues i
+         WHERE i.category = $3
+           AND i.status <> 'resolved'
+           AND i.latitude BETWEEN $1::float8 - $4::float8 AND $1::float8 + $4::float8
+           AND i.longitude BETWEEN $2::float8 - $5::float8 AND $2::float8 + $5::float8
+       ) t
+       WHERE t.distance_m <= $6
+       ORDER BY t.distance_m ASC
+       LIMIT 5`,
+      [lat, lng, category, latDelta, lngDelta, radius, req.user.id]
+    );
+
+    res.json({
+      issues: result.rows.map((r) => ({ ...r, distance_m: Math.round(r.distance_m) })),
+    });
+  } catch (err) {
+    console.error('Nearby issues error:', err);
+    res.status(500).json({ error: 'Failed to check nearby issues' });
+  }
+});
+
 // GET /api/issues/mine - issues reported by the logged-in user (for their dashboard)
 // NOTE: this must be defined before GET /:id, otherwise Express will try to
 // match "mine" as an issue id.
@@ -160,31 +216,27 @@ router.post('/:id/upvote', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/issues/:id/status - update status. Only the person who reported
-// the issue can change its status, since they're the one who can confirm
-// it's actually been fixed.
+// PATCH /api/issues/:id/status - update status.
+// Only authority accounts may change status. Citizens report and support
+// issues, but they can't mark their own report "resolved".
 router.patch('/:id/status', requireAuth, async (req, res) => {
   try {
-    const { status } = req.body;
+    if (req.user.role !== 'authority') {
+      return res.status(403).json({ error: 'Only authority accounts can update an issue\'s status' });
+    }
 
+    const { status } = req.body;
     if (!VALID_STATUSES.includes(status)) {
       return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
-    }
-
-    const existing = await pool.query('SELECT user_id FROM issues WHERE id = $1', [req.params.id]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: 'Issue not found' });
-    }
-    const isOwner = existing.rows[0].user_id === req.user.id;
-    const isAuthority = req.user.role === 'authority';
-    if (!isOwner && !isAuthority) {
-      return res.status(403).json({ error: 'Only the reporter or an authority account can update this issue\'s status' });
     }
 
     const result = await pool.query(
       'UPDATE issues SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [status, req.params.id]
     );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Issue not found' });
+    }
 
     res.json({ issue: result.rows[0] });
   } catch (err) {

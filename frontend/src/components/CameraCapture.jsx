@@ -1,139 +1,153 @@
 import { useEffect, useRef, useState } from "react";
-import "../styles/camera.css";
 
-function describeError(err) {
-  switch (err?.name) {
-    case "NotAllowedError":
-    case "PermissionDeniedError":
-      return "Camera permission was blocked. Click the camera/lock icon in your browser's address bar, allow camera access, then try again.";
-    case "NotFoundError":
-    case "DevicesNotFoundError":
-      return "No camera was found on this device.";
-    case "NotReadableError":
-      return "The camera is being used by another app. Close it and try again.";
-    default:
-      return "Couldn't start the camera on this browser.";
-  }
-}
+const MAX_WIDTH = 1600; // keeps the JPEG well under the 5 MB upload limit
 
-// A live in-app camera: opens the device camera (webcam on laptops, rear
-// camera on phones), shows a preview, and turns the captured frame into a
-// JPEG File that the form uploads exactly like a gallery photo.
-export default function CameraCapture({ onCapture, onClose, onFallback }) {
+// In-app camera. The old `<input capture>` trick only opens a camera on
+// phones; desktop browsers ignore it and show a normal file picker.
+// getUserMedia gives us a real live camera everywhere (HTTPS or localhost).
+export default function CameraCapture({ onCapture, onClose }) {
   const videoRef = useRef(null);
-  const [facing, setFacing] = useState("environment"); // 'environment' = rear, 'user' = front
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
+  const streamRef = useRef(null);
+  const fallbackInputRef = useRef(null);
+
+  const [facing, setFacing] = useState("environment"); // rear camera first
+  const [status, setStatus] = useState("starting"); // starting | ready | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const [canSwitch, setCanSwitch] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    let stream = null;
 
     async function start() {
-      setReady(false);
-      setError("");
+      setStatus("starting");
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setErrorMsg("Camera isn't available in this browser (it needs HTTPS or localhost).");
+        setStatus("error");
+        return;
+      }
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: facing } },
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facing }, width: { ideal: 1920 } },
           audio: false,
         });
+
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          await video.play().catch(() => {});
-          setReady(true);
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
         }
+        setStatus("ready");
+
+        // Device names are only visible after permission is granted.
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (!cancelled) setCanSwitch(devices.filter((d) => d.kind === "videoinput").length > 1);
       } catch (err) {
-        if (!cancelled) setError(describeError(err));
+        if (cancelled) return;
+        if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+          setErrorMsg("Camera permission was blocked. Allow camera access in your browser's address bar and try again.");
+        } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+          setErrorMsg("No camera was found on this device.");
+        } else if (err.name === "NotReadableError") {
+          setErrorMsg("The camera is being used by another app. Close it and try again.");
+        } else {
+          setErrorMsg("Couldn't start the camera.");
+        }
+        setStatus("error");
       }
     }
 
     start();
 
-    // Cleanup: always release the camera (the "camera in use" light goes off).
     return () => {
       cancelled = true;
-      if (stream) stream.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     };
   }, [facing]);
 
   function handleCapture() {
     const video = videoRef.current;
-    if (!video || !ready) return;
+    if (!video || !video.videoWidth) return;
 
+    const scale = Math.min(1, MAX_WIDTH / video.videoWidth);
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(
       (blob) => {
-        if (!blob) {
-          setError("Couldn't capture the photo. Please try again.");
-          return;
-        }
-        const file = new File([blob], `issue-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
-        onCapture(file);
+        if (!blob) return;
+        onCapture(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
       },
       "image/jpeg",
-      0.9
+      0.88
     );
+  }
+
+  function handleFallbackFile(e) {
+    const file = e.target.files?.[0];
+    if (file) onCapture(file);
   }
 
   return (
     <div className="camera-overlay" role="dialog" aria-modal="true" aria-label="Take a photo">
       <div className="camera-modal">
-        <div className="camera-header">
-          <strong>Take a photo</strong>
-          <button type="button" className="camera-close" onClick={onClose} aria-label="Close camera">
-            ✕
-          </button>
-        </div>
+        <button type="button" className="camera-close" onClick={onClose} aria-label="Close camera">
+          ✕
+        </button>
 
-        {error ? (
-          <div className="camera-error">
-            <p>{error}</p>
-            <div className="camera-error-actions">
-              {onFallback && (
-                <button type="button" className="btn btn-primary" onClick={onFallback}>
-                  Open device camera app
-                </button>
-              )}
-              <button type="button" className="btn btn-ghost" onClick={onClose}>
-                Close
-              </button>
-            </div>
+        {status !== "error" && (
+          <div className="camera-stage">
+            <video ref={videoRef} className="camera-video" playsInline muted />
+            {status === "starting" && <p className="camera-note">Starting camera…</p>}
           </div>
-        ) : (
-          <>
-            <div className="camera-stage">
-              <video ref={videoRef} playsInline muted autoPlay className="camera-video" />
-              {!ready && <div className="camera-loading">Starting camera…</div>}
-            </div>
-            <div className="camera-controls">
+        )}
+
+        {status === "error" && (
+          <div className="camera-error">
+            <p>{errorMsg}</p>
+            {/* On a phone this opens the phone's own camera app. */}
+            <button type="button" className="btn btn-ghost" onClick={() => fallbackInputRef.current?.click()}>
+              Open device camera app
+            </button>
+          </div>
+        )}
+
+        <input
+          ref={fallbackInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={handleFallbackFile}
+        />
+
+        {status === "ready" && (
+          <div className="camera-controls">
+            {canSwitch ? (
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="camera-side-btn"
                 onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
               >
-                Flip camera
+                Flip
               </button>
-              <button
-                type="button"
-                className="camera-shutter"
-                onClick={handleCapture}
-                disabled={!ready}
-                aria-label="Capture photo"
-              />
-              <button type="button" className="btn btn-ghost" onClick={onClose}>
-                Cancel
-              </button>
-            </div>
-          </>
+            ) : (
+              <span className="camera-side-btn camera-side-spacer" />
+            )}
+            <button type="button" className="camera-shutter" onClick={handleCapture} aria-label="Capture photo" />
+            <button type="button" className="camera-side-btn" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
         )}
       </div>
     </div>
