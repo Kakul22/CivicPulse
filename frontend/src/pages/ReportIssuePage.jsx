@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api.js";
 import LocationPicker from "../components/LocationPicker.jsx";
-import NearbyIssues from "../components/NearbyIssues.jsx";
 import CameraCapture from "../components/CameraCapture.jsx";
 
 const CATEGORIES = [
@@ -25,7 +24,6 @@ export default function ReportIssuePage() {
     address: "",
   });
   const [location, setLocation] = useState(null); // { lat, lng }
-  const [nearby, setNearby] = useState([]);
 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
@@ -33,70 +31,72 @@ export default function ReportIssuePage() {
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
   const [showCamera, setShowCamera] = useState(false);
 
-  const cameraInputRef = useRef(null);
+  // Duplicate detection state
+  const [nearby, setNearby] = useState([]);
+  const [supportedIds, setSupportedIds] = useState([]);
+  const [supportingId, setSupportingId] = useState(null);
+  const [supportMsg, setSupportMsg] = useState("");
+
   const galleryInputRef = useRef(null);
+
+  // Whenever the pin or category changes, look for the same kind of unresolved
+  // issue within 200 m. Debounced (500 ms) so dragging the pin doesn't fire a
+  // request on every pixel; `cancelled` drops answers that arrive late.
+  useEffect(() => {
+    if (!location) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .getNearbyIssues({ lat: location.lat, lng: location.lng, category: form.category, radius: 200 }, token)
+        .then((data) => {
+          if (!cancelled) setNearby(data.issues);
+        })
+        .catch(() => {
+          if (!cancelled) setNearby([]); // a failed check must never block reporting
+        });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [location, form.category, token]);
+
+  async function handleSupport(issueId) {
+    setSupportingId(issueId);
+    try {
+      const result = await api.toggleUpvote(issueId, token);
+      // toggleUpvote is a toggle; we only call it for issues not yet supported,
+      // so a result of upvoted === true is what we expect.
+      if (result.upvoted) {
+        setSupportedIds((prev) => [...prev, issueId]);
+        setSupportMsg("Thanks. Your support was added to the existing report, so no new report is needed.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSupportingId(null);
+    }
+  }
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Duplicate detection: whenever the pin or category changes, look for
-  // unresolved issues of the same category within ~200m. The 500ms delay
-  // (debounce) avoids firing a request on every tiny pin drag.
-  useEffect(() => {
-    if (!location) {
-      setNearby([]);
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      api
-        .getNearby(location.lat, location.lng, form.category)
-        .then((data) => {
-          if (!cancelled) setNearby(data.issues);
-        })
-        .catch(() => {
-          if (!cancelled) setNearby([]);
-        });
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [location, form.category]);
-
-  // "Take a photo": use the live in-app camera when the browser supports it
-  // (works on laptops AND phones, needs HTTPS or localhost). Otherwise fall
-  // back to the native file input with capture="environment".
-  function openCamera() {
-    if (navigator.mediaDevices?.getUserMedia) {
-      setShowCamera(true);
-    } else {
-      cameraInputRef.current?.click();
-    }
+  function handleFileSelected(e) {
+    uploadFile(e.target.files?.[0]);
   }
 
   function handleCameraCapture(file) {
     setShowCamera(false);
-    processFile(file);
+    uploadFile(file);
   }
 
-  // If the live camera is blocked (e.g. some in-app browsers), let the user
-  // use the phone's own camera app instead.
-  function handleCameraFallback() {
-    setShowCamera(false);
-    cameraInputRef.current?.click();
-  }
+  async function uploadFile(file) {
+    if (!file) return;
 
-  function handleFileSelected(e) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-  }
-
-  async function processFile(file) {
     setImagePreview(URL.createObjectURL(file));
     setError("");
     setImageUploading(true);
@@ -114,7 +114,6 @@ export default function ReportIssuePage() {
   function removeImage() {
     setImagePreview(null);
     setImageUrl(null);
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (galleryInputRef.current) galleryInputRef.current.value = "";
   }
 
@@ -161,11 +160,7 @@ export default function ReportIssuePage() {
       {error && <div className="form-error">{error}</div>}
 
       {showCamera && (
-        <CameraCapture
-          onCapture={handleCameraCapture}
-          onClose={() => setShowCamera(false)}
-          onFallback={handleCameraFallback}
-        />
+        <CameraCapture onCapture={handleCameraCapture} onClose={() => setShowCamera(false)} />
       )}
 
       <form onSubmit={handleSubmit}>
@@ -177,7 +172,7 @@ export default function ReportIssuePage() {
               <button
                 type="button"
                 className="photo-capture-btn"
-                onClick={openCamera}
+                onClick={() => setShowCamera(true)}
               >
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
                   <path
@@ -204,15 +199,6 @@ export default function ReportIssuePage() {
             </div>
           )}
 
-          {/* capture="environment" opens the rear camera on mobile devices */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            style={{ display: "none" }}
-            onChange={handleFileSelected}
-          />
           <input
             ref={galleryInputRef}
             type="file"
@@ -288,7 +274,40 @@ export default function ReportIssuePage() {
           <LocationPicker value={location} onChange={setLocation} />
         </div>
 
-        <NearbyIssues issues={nearby} />
+        {supportMsg && <div className="duplicate-thanks">{supportMsg}</div>}
+
+        {nearby.length > 0 && (
+          <div className="duplicate-box">
+            <h3>Similar issues already reported nearby</h3>
+            <p className="field-hint">
+              Is one of these the same problem? Supporting it helps the authority see how many people are affected.
+            </p>
+            {nearby.map((n) => {
+              const alreadySupported = n.supported_by_me || supportedIds.includes(n.id);
+              return (
+                <div className="duplicate-item" key={n.id}>
+                  <div>
+                    <p className="duplicate-item-title">{n.title}</p>
+                    <p className="duplicate-item-meta">
+                      {n.distance_m} m away · {n.upvote_count} supporting
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={alreadySupported || supportingId === n.id}
+                    onClick={() => handleSupport(n.id)}
+                  >
+                    {alreadySupported ? "Supported ✓" : supportingId === n.id ? "Saving…" : "I'm facing this too"}
+                  </button>
+                </div>
+              );
+            })}
+            <p className="field-hint" style={{ marginTop: 10 }}>
+              Different problem? Just continue and submit your report below.
+            </p>
+          </div>
+        )}
 
         <button className="btn btn-primary btn-block" disabled={submitting || imageUploading}>
           {submitting ? "Submitting…" : "Submit report"}

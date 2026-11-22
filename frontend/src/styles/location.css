@@ -1,0 +1,25 @@
+/* State / city filters on the issues list */
+.location-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.location-filters .status-select {
+  min-width: 170px;
+}
+
+.location-filters .status-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Detected city under the map picker on the report form */
+.detected-place {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--teal);
+}

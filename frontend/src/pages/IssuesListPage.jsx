@@ -14,7 +14,7 @@ const CATEGORIES = [
 ];
 
 export default function IssuesListPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,7 +27,7 @@ export default function IssuesListPage() {
     setError("");
 
     api
-      .getIssues(category ? { category } : {})
+      .getIssues(category ? { category } : {}, token)
       .then((data) => {
         if (!cancelled) setIssues(data.issues);
       })
@@ -41,7 +41,7 @@ export default function IssuesListPage() {
     return () => {
       cancelled = true;
     };
-  }, [category]);
+  }, [category, token]);
 
   function handleUpvoteChange(issueId, newCount) {
     setIssues((prev) =>
@@ -55,14 +55,41 @@ export default function IssuesListPage() {
     );
   }
 
+  const isAuthority = user?.role === "authority";
+  const statusCounts = issues.reduce(
+    (acc, i) => ({ ...acc, [i.status]: (acc[i.status] || 0) + 1 }),
+    {}
+  );
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Issues near you</h1>
-          <p>See what's been reported, and add your voice to what matters.</p>
+          <h1>{isAuthority ? "Authority dashboard" : "Issues near you"}</h1>
+          <p>
+            {isAuthority
+              ? "Review reported issues, see who filed them, and update their status."
+              : "See what's been reported, and add your voice to what matters."}
+          </p>
         </div>
       </div>
+
+      {isAuthority && issues.length > 0 && (
+        <div className="stats-bar">
+          <div className="stats-item">
+            <span className="stats-value">{statusCounts.reported || 0}</span>
+            <span className="stats-label">Reported</span>
+          </div>
+          <div className="stats-item">
+            <span className="stats-value">{statusCounts.in_progress || 0}</span>
+            <span className="stats-label">In progress</span>
+          </div>
+          <div className="stats-item">
+            <span className="stats-value">{statusCounts.resolved || 0}</span>
+            <span className="stats-label">Resolved</span>
+          </div>
+        </div>
+      )}
 
       <div className="view-toggle">
         <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
@@ -107,7 +134,7 @@ export default function IssuesListPage() {
             key={issue.id}
             issue={issue}
             onUpvoteChange={handleUpvoteChange}
-            editable={user?.role === "authority"}
+            editable={isAuthority}
             onStatusChange={handleStatusChange}
           />
         ))}

@@ -1138,8 +1138,12 @@ select {
   padding-top: 14px;
   border-top: 1px solid var(--line);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
+}
+
+.reporter-contact strong {
+  color: var(--ink);
 }
 
 .status-control label {
@@ -1160,6 +1164,44 @@ select {
 
 .status-select:focus {
   border-color: var(--teal);
+}
+
+/* ============================================
+   Authority dashboard stats bar
+   ============================================ */
+
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.stats-item {
+  background: var(--surface);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  color: var(--ink);
+}
+
+.stats-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
 }
 
 @media (max-width: 720px) {
@@ -1185,4 +1227,146 @@ select {
   .category-picker {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ============================================
+   In-app camera
+   ============================================ */
+.camera-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(20, 35, 29, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.camera-modal {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  background: var(--ink);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.camera-stage {
+  position: relative;
+  background: #000;
+  aspect-ratio: 4 / 3;
+}
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.camera-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--paper);
+  margin: 0;
+}
+.camera-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+.camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+.camera-side-btn {
+  min-width: 64px;
+  background: none;
+  border: none;
+  color: var(--paper);
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+.camera-side-spacer {
+  display: inline-block;
+}
+.camera-shutter {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 4px solid var(--paper);
+  background: var(--brand);
+  cursor: pointer;
+}
+.camera-shutter:active {
+  transform: scale(0.94);
+}
+.camera-error {
+  padding: 40px 24px 28px;
+  text-align: center;
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+.camera-error p {
+  margin: 0;
+}
+
+/* ============================================
+   Duplicate issue warning
+   ============================================ */
+.duplicate-box {
+  background: var(--brand-soft);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.duplicate-box h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.duplicate-box > p {
+  margin: 0 0 10px;
+}
+.duplicate-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.duplicate-item-title {
+  font-weight: 600;
+  margin: 0;
+}
+.duplicate-item-meta {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+.duplicate-thanks {
+  background: var(--teal-soft);
+  border: 1px solid var(--teal);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
 }
